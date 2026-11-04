@@ -1,3 +1,4 @@
+import { appendEvent } from "../audit/log.js";
 import { computeToolDefinitionHash } from "../hash/call-hash.js";
 import type { JsonValue } from "../hash/canonical-json.js";
 import type { GatekeepDb } from "../db/client.js";
@@ -28,7 +29,7 @@ export class ToolRegistry {
    * last time the gateway saw that tool — surfacing rug pulls rather than
    * silently trusting a changed definition.
    */
-  async build(db: GatekeepDb, upstreams: ConnectedUpstream[]): Promise<BuildResult> {
+  async build(db: GatekeepDb, upstreams: ConnectedUpstream[], runId = "startup"): Promise<BuildResult> {
     const warnings: string[] = [];
     this.byPrefixedName.clear();
 
@@ -39,11 +40,21 @@ export class ToolRegistry {
         const definitionHash = computeToolDefinitionHash(definition as JsonValue);
         const pinResult = checkAndRecordPin(db, upstream.id, tool.name, definitionHash);
         if (pinResult.kind === "changed") {
-          warnings.push(
+          const warning =
             `tool "${upstream.id}/${tool.name}" definition changed since it was pinned ` +
-              `(was ${pinResult.previousHash.slice(0, 12)}…, now ${definitionHash.slice(0, 12)}…) — ` +
-              `review and re-pin before trusting it (see src/db/repositories/tool-pins.ts#repin)`,
-          );
+            `(was ${pinResult.previousHash.slice(0, 12)}…, now ${definitionHash.slice(0, 12)}…) — ` +
+            `review and re-pin before trusting it (see src/db/repositories/tool-pins.ts#repin)`;
+          warnings.push(warning);
+          appendEvent(db, {
+            runId,
+            event: "tool_definition_changed",
+            payload: {
+              server_id: upstream.id,
+              tool_name: tool.name,
+              previous_definition_hash: pinResult.previousHash,
+              new_definition_hash: definitionHash,
+            },
+          });
         }
         const prefixedName = `${upstream.id}${PREFIX_SEP}${tool.name}`;
         this.register({ serverId: upstream.id, toolName: tool.name, prefixedName, definitionHash, definition });

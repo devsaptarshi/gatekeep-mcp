@@ -1,7 +1,12 @@
 # Upstream MCP servers the gateway proxies to. Each is spawned as a local
 # stdio child process from THIS config at gateway startup — never from an
 # API call at runtime (see SECURITY.md).
+# Spawned directly via the tsx binary, not through `npx`/a shell — an
+# intermediate npm/shell layer doesn't reliably forward SIGTERM to the
+# real node process, which left orphaned upstream processes behind on
+# shutdown (see KNOWN_LIMITS.md history). Spawning the binary directly
+# means the gateway's kill signal goes straight to the process running it.
 upstreams:
   - id: erp-fixture
-    command: npx
-    args: ["tsx", "fixtures/erp-server/index.ts"]
+    command: ./node_modules/.bin/tsx
+    args: ["fixtures/erp-server/index.ts"]

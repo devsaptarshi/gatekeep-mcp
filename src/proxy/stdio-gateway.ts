@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { randomUUID } from "node:crypto";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadConfig } from "../config.js";
 import { openDb } from "../db/client.js";
@@ -22,12 +23,14 @@ async function main() {
     console.error(`[gatekeep] WARNING: ${warning}`);
   }
 
+  const runId = randomUUID();
   const server = buildGatewayServer({
     db,
     registry,
     policyEngine,
     principal: config.principal,
     upstreams,
+    runId,
   });
 
   const transport = new StdioServerTransport();

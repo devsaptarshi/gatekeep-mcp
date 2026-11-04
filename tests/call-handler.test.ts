@@ -55,7 +55,7 @@ beforeEach(async () => {
 });
 
 function deps() {
-  return { db, registry, policyEngine, principal: "alice", forwardToUpstream };
+  return { db, registry, policyEngine, principal: "alice", forwardToUpstream, runId: "test-run" };
 }
 
 describe("handleToolCall", () => {

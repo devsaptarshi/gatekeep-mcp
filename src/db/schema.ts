@@ -42,3 +42,24 @@ export const approvals = sqliteTable("approvals", {
   expiresAt: text("expires_at").notNull(),
   consumedAt: text("consumed_at"),
 });
+
+/**
+ * Tamper-evident, hash-chained audit log. Every policy decision and every
+ * approval lifecycle transition appends one row. `event_hash` is a SHA-256
+ * over the row's own fields AND `prev_hash` (the previous row's
+ * event_hash) — so editing or deleting any row, or reordering them, breaks
+ * the chain from that point forward. `gatekeep verify` walks the whole
+ * table and recomputes it; it must catch every edited row, not just the
+ * most recent one.
+ */
+export const auditEvents = sqliteTable("audit_events", {
+  seq: integer("seq").primaryKey({ autoIncrement: true }),
+  runId: text("run_id").notNull(),
+  event: text("event").notNull(),
+  callHash: text("call_hash"),
+  decision: text("decision"),
+  prevHash: text("prev_hash").notNull(),
+  eventHash: text("event_hash").notNull(),
+  redactedPayload: text("redacted_payload").notNull(), // JSON string, secrets stripped before storage
+  createdAt: text("created_at").notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
+});

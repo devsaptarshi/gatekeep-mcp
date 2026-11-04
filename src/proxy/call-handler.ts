@@ -1,3 +1,4 @@
+import { appendEvent } from "../audit/log.js";
 import { computeCallHash } from "../hash/call-hash.js";
 import type { JsonValue } from "../hash/canonical-json.js";
 import type { GatekeepDb } from "../db/client.js";
@@ -28,6 +29,8 @@ export interface CallHandlerDeps {
   policyEngine: PolicyEngine;
   principal: string;
   forwardToUpstream: ForwardFn;
+  /** Groups this handler's audit events with the gateway process (or test run) that made the call. */
+  runId: string;
 }
 
 function errorResult(text: string): ToolCallResult {
@@ -58,6 +61,11 @@ export async function handleToolCall(
   const args = rawArgs ?? {};
   const tool = deps.registry.get(prefixedName);
   if (!tool) {
+    appendEvent(deps.db, {
+      runId: deps.runId,
+      event: "unknown_tool_call",
+      payload: { prefixedName, arguments: args as JsonValue, principal: deps.principal },
+    });
     return errorResult(
       `Unknown tool "${prefixedName}". Expected the form "<server>__<tool>" for a tool this gateway has registered.`,
     );
@@ -72,15 +80,24 @@ export async function handleToolCall(
     policyVersion: deps.policyEngine.policyVersion,
   });
 
+  const auditPayload: JsonValue = {
+    server_id: tool.serverId,
+    tool_name: tool.toolName,
+    arguments: args as JsonValue,
+    principal: deps.principal,
+  };
+
   const consumed = consumeApproved(deps.db, callHash);
   if (consumed) {
     const forwardArgs = JSON.parse(consumed.canonicalArgs) as Record<string, unknown>;
+    appendEvent(deps.db, { runId: deps.runId, event: "approval_consumed_and_executed", callHash, decision: "approve", payload: auditPayload });
     return deps.forwardToUpstream(tool.serverId, tool.toolName, forwardArgs);
   }
 
   const existing = findByCallHash(deps.db, callHash);
   if (existing) {
     if (existing.status === "approved" && existing.consumedAt) {
+      appendEvent(deps.db, { runId: deps.runId, event: "replay_blocked_already_consumed", callHash, payload: auditPayload });
       return errorResult(
         "This exact call was already approved and executed once. Approvals are single-use — " +
           "an identical repeat needs fresh policy review, which this gateway doesn't support for " +
@@ -88,11 +105,13 @@ export async function handleToolCall(
       );
     }
     if (existing.status === "denied") {
+      appendEvent(deps.db, { runId: deps.runId, event: "call_denied_cached", callHash, decision: "deny", payload: auditPayload });
       return errorResult(`Denied by an approver: ${existing.reason}`);
     }
     if (existing.status === "pending") {
       const afterExpiryCheck = expireIfPastDue(deps.db, existing.id) ?? existing;
       if (afterExpiryCheck.status === "pending") {
+        appendEvent(deps.db, { runId: deps.runId, event: "approval_still_pending", callHash, payload: auditPayload });
         return errorResult(
           `Approval pending (id=${afterExpiryCheck.id}). Ask an approver to run: gatekeep approve ${afterExpiryCheck.id}`,
         );
@@ -103,6 +122,7 @@ export async function handleToolCall(
     if (fresh?.status === "expired") {
       const renewed = renewExpiredToPending(deps.db, fresh.id, deps.policyEngine.file.defaults.approval_ttl_seconds);
       if (renewed) {
+        appendEvent(deps.db, { runId: deps.runId, event: "approval_renewed_after_expiry", callHash, payload: auditPayload });
         return errorResult(
           `Approval pending (id=${renewed.id}). Ask an approver to run: gatekeep approve ${renewed.id}`,
         );
@@ -118,10 +138,12 @@ export async function handleToolCall(
   });
 
   if (decision.action === "deny") {
+    appendEvent(deps.db, { runId: deps.runId, event: "policy_denied", callHash, decision: "deny", payload: auditPayload });
     return errorResult(`Denied by policy: ${decision.reason}`);
   }
 
   if (decision.action === "allow") {
+    appendEvent(deps.db, { runId: deps.runId, event: "policy_allowed_and_executed", callHash, decision: "allow", payload: auditPayload });
     return deps.forwardToUpstream(tool.serverId, tool.toolName, args);
   }
 
@@ -134,6 +156,7 @@ export async function handleToolCall(
     reason: decision.reason,
     ttlSeconds: deps.policyEngine.file.defaults.approval_ttl_seconds,
   });
+  appendEvent(deps.db, { runId: deps.runId, event: "approval_created", callHash, decision: "approve", payload: auditPayload });
   return errorResult(
     `Approval required (id=${created.id}): ${decision.reason}. ` +
       `Ask an approver to run: gatekeep approve ${created.id}, then retry this exact call.`,

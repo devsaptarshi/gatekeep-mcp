@@ -12,6 +12,7 @@ export interface GatewayServerDeps {
   policyEngine: PolicyEngine;
   principal: string;
   upstreams: ConnectedUpstream[];
+  runId: string;
 }
 
 /**
@@ -45,6 +46,7 @@ export function buildGatewayServer(deps: GatewayServerDeps): Server {
         registry: deps.registry,
         policyEngine: deps.policyEngine,
         principal: deps.principal,
+        runId: deps.runId,
         forwardToUpstream: async (serverId, toolName, forwardArgs) => {
           const upstream = upstreamsById.get(serverId);
           if (!upstream) {

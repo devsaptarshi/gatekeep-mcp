@@ -14,8 +14,9 @@ function assert(cond: unknown, msg: string): asserts cond {
 
 async function main() {
   const transport = new StdioClientTransport({
-    command: "npx",
-    args: ["tsx", "src/proxy/stdio-gateway.ts"],
+    // Direct binary, not `npx` — see gatekeep.config.yaml's comment on why.
+    command: `${PROJECT_DIR}/node_modules/.bin/tsx`,
+    args: ["src/proxy/stdio-gateway.ts"],
     cwd: PROJECT_DIR,
   });
   const client = new Client({ name: "smoke-test-client", version: "0.0.1" });
@@ -56,7 +57,7 @@ async function main() {
   console.log("[smoke] swapped-argument call correctly got its own separate hold");
 
   // 4. Approve the ORIGINAL call via the CLI (separate process, same DB).
-  const approveOutput = execFileSync("npx", ["tsx", "src/cli/index.ts", "approve", approvalId], {
+  const approveOutput = execFileSync(`${PROJECT_DIR}/node_modules/.bin/tsx`, ["src/cli/index.ts", "approve", approvalId], {
     cwd: PROJECT_DIR,
     encoding: "utf8",
   });
@@ -84,6 +85,30 @@ async function main() {
   assert(deniedText.toLowerCase().includes("denied"), "denial message should say denied");
 
   await client.close();
+
+  // 8. The audit log should verify clean after everything above...
+  const verifyOk = execFileSync(`${PROJECT_DIR}/node_modules/.bin/tsx`, ["src/cli/index.ts", "verify"], { cwd: PROJECT_DIR, encoding: "utf8" });
+  console.log("[smoke] verify (before tamper):", verifyOk.trim());
+  assert(verifyOk.includes("OK"), "audit chain should verify clean before tampering");
+
+  // ...and must FAIL once a row is edited directly in the SQLite file,
+  // proving the suite can actually catch something (not vacuously green).
+  const Database = (await import("better-sqlite3")).default;
+  const raw = new Database(`${PROJECT_DIR}/data/gatekeep.sqlite`);
+  raw.exec(`UPDATE audit_events SET redacted_payload = '{"tampered":true}' WHERE seq = (SELECT MIN(seq) FROM audit_events)`);
+  raw.close();
+
+  let verifyFailed = false;
+  try {
+    execFileSync(`${PROJECT_DIR}/node_modules/.bin/tsx`, ["src/cli/index.ts", "verify"], { cwd: PROJECT_DIR, encoding: "utf8" });
+  } catch (err) {
+    verifyFailed = true;
+    const output = (err as { stdout?: Buffer; stderr?: Buffer }).stderr?.toString() ?? "";
+    console.log("[smoke] verify (after tamper):", output.trim());
+    assert(output.includes("FAILED"), "verify should report FAILED after tampering");
+  }
+  assert(verifyFailed, "gatekeep verify must exit non-zero after the audit log is tampered with");
+
   console.log("\n[smoke] ALL CHECKS PASSED");
   process.exit(0);
 }

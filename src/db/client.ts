@@ -33,6 +33,18 @@ CREATE TABLE IF NOT EXISTS approvals (
   expires_at TEXT NOT NULL,
   consumed_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS audit_events (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id TEXT NOT NULL,
+  event TEXT NOT NULL,
+  call_hash TEXT,
+  decision TEXT,
+  prev_hash TEXT NOT NULL,
+  event_hash TEXT NOT NULL,
+  redacted_payload TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
 `;
 
 export type GatekeepDb = BetterSQLite3Database<typeof schema>;

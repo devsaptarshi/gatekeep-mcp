@@ -19,14 +19,15 @@ radius. It does not make agents safe.
 - **No multi-tenant / RBAC model in v1.** Single "allowed approver" concept.
   No SSO, no roles.
 - **No OAuth proxying.** One credential per upstream via env var.
-- **Process teardown is best-effort, not instant.** On shutdown the gateway
-  closes its upstream connections before exiting (`SIGTERM`/`SIGINT`
-  handlers in `src/proxy/stdio-gateway.ts`), but each layer's own
-  SIGTERM→2s-wait→SIGKILL sequence in the MCP SDK's `StdioClientTransport`
-  can stack (client→gateway→upstream), so a hard-killed client can
-  occasionally outrace a clean cascade and leave an upstream fixture
-  process orphaned. Not a correctness issue — the DB state (and therefore
-  every security property) is unaffected — just a process-hygiene gap
-  worth fixing before this runs unattended for long periods.
+- **Spawn upstreams by binary path, not through a shell wrapper.** Config
+  (`gatekeep.config.yaml`) and anything else that spawns a gateway or
+  upstream process must give `command` the real binary
+  (`./node_modules/.bin/tsx`, not `npx tsx` or anything invoking a shell).
+  An intermediate `npx`/`npm exec`/`sh -c` layer doesn't reliably forward
+  `SIGTERM` down to the actual node process, which left orphaned upstream
+  processes behind on every shutdown until this was fixed — confirmed with
+  `ps` before and after. Not a correctness issue (DB state, and therefore
+  every security property, was unaffected) but worth getting right before
+  anyone runs this unattended.
 - **Untested against MCP clients predating the 2026-07-28 spec revision** —
   see SECURITY.md for what changed and what's untested.

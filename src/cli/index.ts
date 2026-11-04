@@ -3,6 +3,7 @@
 // Vite, with a "reveal mode" for hidden whitespace/Unicode tricks) is a
 // Week 2 item per the build spec — this exists so the end-to-end flow is
 // testable before that UI exists.
+import { appendEvent, verifyChain } from "../audit/log.js";
 import { loadConfig } from "../config.js";
 import { openDb } from "../db/client.js";
 import { approve, deny, findById } from "../db/repositories/approvals.js";
@@ -18,6 +19,7 @@ function usage(): never {
       "  gatekeep show <id>            Show one approval's full (raw, unsummarized) arguments",
       "  gatekeep approve <id>         Approve a pending approval",
       "  gatekeep deny <id>            Deny a pending approval",
+      "  gatekeep verify                Verify the audit log's hash chain end to end",
     ].join("\n"),
   );
   process.exit(1);
@@ -60,6 +62,13 @@ async function main() {
         console.error(`Could not approve ${arg} — it may not exist, may already be decided, or may have expired.`);
         process.exit(1);
       }
+      appendEvent(db, {
+        runId: "cli",
+        event: "approval_approved_by_human",
+        callHash: result.callHash,
+        decision: "approve",
+        payload: { approval_id: arg, decided_by: APPROVER_PRINCIPAL, server_id: result.serverId, tool_name: result.toolName },
+      });
       console.log(`Approved ${arg}. The agent can now retry the exact same call.`);
       return;
     }
@@ -70,7 +79,25 @@ async function main() {
         console.error(`Could not deny ${arg} — it may not exist or may already be decided.`);
         process.exit(1);
       }
+      appendEvent(db, {
+        runId: "cli",
+        event: "approval_denied_by_human",
+        callHash: result.callHash,
+        decision: "deny",
+        payload: { approval_id: arg, decided_by: APPROVER_PRINCIPAL, server_id: result.serverId, tool_name: result.toolName },
+      });
       console.log(`Denied ${arg}.`);
+      return;
+    }
+    case "verify": {
+      const result = verifyChain(db);
+      if (result.ok) {
+        console.log(`OK — ${result.checked} audit event(s) verified, chain intact from genesis.`);
+        return;
+      }
+      console.error(`FAILED at seq=${result.brokenAtSeq}: ${result.reason}`);
+      console.error(`(${result.checked} event(s) checked before the break was found)`);
+      process.exit(1);
       return;
     }
     default:
