@@ -49,8 +49,34 @@ both of which are core to gatekeep's design.
 
 ## Status
 
-Week 1 in progress — see [the build spec] for the three-week plan. Not
-ready for anything beyond local development and the fixtures in this repo.
+Week 2 of 3 done — see the build spec for the three-week plan. Not ready
+for anything beyond local development and the fixtures in this repo.
+
+Shipped so far: canonical-hash approval binding, the MCP stdio and
+Streamable HTTP proxy, a YAML/CEL policy engine, a hash-chained tamper-
+evident audit log (`gatekeep verify`), secret redaction, local-gateway HTTP
+hardening (Origin allowlist, bearer token, header/body consistency), and a
+89-case layer-1 red-team corpus. 153/153 tests pass.
+
+### Proving the test suite can actually fail
+
+A green suite that can't go red proves nothing. As a deliberate check, the
+TTL-expiry guard in `approve()` (`src/db/repositories/approvals.ts`) was
+removed and the full suite re-run:
+
+```
+FAIL  tests/db-approvals.test.ts > approve() expires a row past its TTL instead of approving it
+FAIL  tests/redteam/layer1-corpus.test.ts > [redteam] replay and expiry > an expired (never-approved) pending request cannot be smuggled through by waiting
+Test Files  2 failed | 6 passed (8)
+     Tests  2 failed | 151 passed (153)
+```
+
+Two tests failed, from two different files (one unit test, one red-team
+case), exactly as expected for that specific control. The guard was then
+restored (`git checkout -- src/db/repositories/approvals.ts`) and the
+suite returned to 153/153. This is a manual spot-check, not a standing CI
+gate yet — automating "intentionally break one control per run and assert
+something fails" is tracked for Week 3.
 
 ## Quickstart (dev)
 
