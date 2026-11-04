@@ -8,6 +8,7 @@ import { loadConfig } from "../config.js";
 import { openDb } from "../db/client.js";
 import { approve, deny, findById } from "../db/repositories/approvals.js";
 import { approvals } from "../db/schema.js";
+import { revealDeep } from "../web/reveal.js";
 
 const APPROVER_PRINCIPAL = process.env.GATEKEEP_APPROVER ?? "cli-approver";
 
@@ -16,7 +17,8 @@ function usage(): never {
     [
       "Usage:",
       "  gatekeep list                 List pending approvals",
-      "  gatekeep show <id>            Show one approval's full (raw, unsummarized) arguments",
+      "  gatekeep show <id> [--reveal] Show one approval's full (raw, unsummarized) arguments",
+      "                                 --reveal surfaces zero-width/RTL-override/NBSP tricks",
       "  gatekeep approve <id>         Approve a pending approval",
       "  gatekeep deny <id>            Deny a pending approval",
       "  gatekeep verify                Verify the audit log's hash chain end to end",
@@ -26,7 +28,11 @@ function usage(): never {
 }
 
 async function main() {
-  const [cmd, arg] = process.argv.slice(2);
+  const rawArgs = process.argv.slice(2);
+  const revealFlagIndex = rawArgs.indexOf("--reveal");
+  const revealRequested = revealFlagIndex !== -1;
+  if (revealRequested) rawArgs.splice(revealFlagIndex, 1);
+  const [cmd, arg] = rawArgs;
   const config = loadConfig(process.env.GATEKEEP_CONFIG_PATH ?? "./gatekeep.config.yaml");
   const db = openDb(config.dbPath);
 
@@ -52,7 +58,13 @@ async function main() {
       }
       // Raw, unsummarized — the whole point of exact-call approval is that
       // the approver sees the literal arguments, not a model's gloss on them.
-      console.log(JSON.stringify(row, null, 2));
+      const display = revealRequested
+        ? { ...row, canonicalArgs: JSON.stringify(revealDeep(JSON.parse(row.canonicalArgs))) }
+        : row;
+      console.log(JSON.stringify(display, null, 2));
+      if (!revealRequested) {
+        console.log("\n(pass --reveal to surface zero-width/RTL-override/NBSP tricks hidden in the arguments above)");
+      }
       return;
     }
     case "approve": {

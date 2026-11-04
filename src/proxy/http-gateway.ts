@@ -10,6 +10,8 @@ import { buildGatewayServer } from "./gateway-server.js";
 import { checkHeaderBodyConsistency, checkLocalToken, checkOrigin } from "./http-security.js";
 import { ToolRegistry } from "./tool-registry.js";
 import { closeUpstreams, connectUpstreams } from "./upstream-manager.js";
+import { buildWebApi } from "../web/api.js";
+import { SessionStore } from "../web/session.js";
 
 const HOST = process.env.GATEKEEP_HTTP_HOST ?? "127.0.0.1";
 const PORT = Number(process.env.GATEKEEP_HTTP_PORT ?? 3100);
@@ -89,6 +91,9 @@ async function main() {
   });
 
   app.get("/healthz", (c) => c.json({ ok: true, tools: registry.list().length, policy: policyEngine.policyVersion }));
+
+  const sessions = new SessionStore();
+  app.route("/api", buildWebApi({ db, approverToken: config.approverToken, sessions }));
 
   const server = serve({ fetch: app.fetch, hostname: HOST, port: PORT }, (info) => {
     console.error(`[gatekeep-http] listening on http://${HOST}:${info.port}/mcp (${registry.list().length} tool(s))`);

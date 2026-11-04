@@ -19,6 +19,15 @@ export interface GatewayConfig {
   dbPath: string;
   policyPath: string;
   localToken: string;
+  /**
+   * Deliberately a SEPARATE secret from `localToken`. `localToken` is the
+   * agent-facing credential for /mcp; this is the human-facing credential
+   * for the approval inbox. If they were the same value, an agent holding
+   * its own gateway token could log into the inbox and approve its own
+   * pending calls — exactly the self-approval gap exact-call hashing is
+   * supposed to prevent one layer up.
+   */
+  approverToken: string;
   /** v1: a single fixed principal. Multi-user/RBAC is explicitly out of scope — see README. */
   principal: string;
 }
@@ -31,6 +40,7 @@ export function loadConfig(configPath = "./gatekeep.config.yaml"): GatewayConfig
     dbPath: process.env.GATEKEEP_DB_PATH ?? "./data/gatekeep.sqlite",
     policyPath: process.env.GATEKEEP_POLICY_PATH ?? "./policies/default.yaml",
     localToken: process.env.GATEKEEP_LOCAL_TOKEN ?? "dev-only-insecure-token",
+    approverToken: process.env.GATEKEEP_APPROVER_TOKEN ?? "dev-only-insecure-approver-token",
     principal: process.env.GATEKEEP_PRINCIPAL ?? "local-user",
   };
 }
