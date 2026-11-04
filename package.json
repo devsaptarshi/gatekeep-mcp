@@ -1,0 +1,40 @@
+{
+  "name": "gatekeep-mcp",
+  "version": "0.1.0",
+  "description": "A transparent MCP gateway that holds risky tool calls for human approval, bound to the exact arguments.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "gatekeep": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev:erp-fixture": "tsx fixtures/erp-server/index.ts",
+    "dev:gateway": "tsx src/proxy/stdio-gateway.ts",
+    "cli": "tsx src/cli/index.ts",
+    "smoke": "tsx scripts/smoke-test.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts"
+  },
+  "dependencies": {
+    "@marcbachmann/cel-js": "^8.0.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "better-sqlite3": "^11.9.1",
+    "drizzle-orm": "^0.45.4",
+    "minimatch": "^11.0.4",
+    "yaml": "^2.7.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.5",
+    "drizzle-kit": "^0.31.2",
+    "fast-check": "^3.23.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^5.1.0"
+  }
+}

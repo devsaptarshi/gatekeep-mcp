@@ -1,0 +1,7 @@
+# Upstream MCP servers the gateway proxies to. Each is spawned as a local
+# stdio child process from THIS config at gateway startup — never from an
+# API call at runtime (see SECURITY.md).
+upstreams:
+  - id: erp-fixture
+    command: npx
+    args: ["tsx", "fixtures/erp-server/index.ts"]

@@ -1,0 +1,45 @@
+version: "0.1.0"
+
+defaults:
+  # A tool nobody wrote a rule for is NOT auto-allowed. Safer default for a
+  # gateway whose whole point is "unknown risky calls wait for a human."
+  unknown_tool: approve
+  # A broken policy (bad YAML, a `when` that throws) fails closed.
+  on_gateway_error: deny
+  approval_ttl_seconds: 600
+
+servers:
+  erp-fixture:
+    rules:
+      # Read-only tools: no human has to look at a report request.
+      - tool: "list_vendors"
+        action: allow
+        reason: "read-only lookup"
+      - tool: "get_vendor"
+        action: allow
+        reason: "read-only lookup"
+      - tool: "list_pending_invoices"
+        action: allow
+        reason: "read-only lookup"
+      - tool: "get_account_balance"
+        action: allow
+        reason: "read-only lookup"
+
+      # Payments above a small threshold always wait for a human, no matter
+      # what the model claims about the invoice being "pre-approved" — that
+      # claim lives in untrusted tool-result text, and the policy engine
+      # never reads tool-result text, only the call's own arguments.
+      - tool: "create_payment"
+        action: approve
+        when: "arguments.amountInr > 50000"
+        reason: "payment above INR 50,000 requires approval"
+      - tool: "create_payment"
+        action: allow
+        when: "arguments.amountInr <= 50000"
+        reason: "small payment, auto-allowed"
+
+      # Changing where money gets sent is always high-risk, regardless of
+      # amount.
+      - tool: "update_vendor_bank_details"
+        action: deny
+        reason: "bank-detail changes are not permitted through the gateway in v1 — do this out-of-band and re-pin manually"
