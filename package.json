@@ -11,6 +11,7 @@
     "build": "tsc -p tsconfig.json",
     "dev:erp-fixture": "tsx fixtures/erp-server/index.ts",
     "dev:gateway": "tsx src/proxy/stdio-gateway.ts",
+    "dev:gateway-http": "tsx src/proxy/http-gateway.ts",
     "cli": "tsx src/cli/index.ts",
     "smoke": "tsx scripts/smoke-test.ts",
     "test": "vitest run",
@@ -23,7 +24,9 @@
     "@marcbachmann/cel-js": "^8.0.0",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "better-sqlite3": "^11.9.1",
+    "@hono/node-server": "^2.1.6",
     "drizzle-orm": "^0.45.4",
+    "hono": "^4.13.16",
     "minimatch": "^11.0.4",
     "yaml": "^2.7.0",
     "zod": "^4.6.7"
