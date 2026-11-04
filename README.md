@@ -83,6 +83,20 @@ something fails" is tracked for Week 3.
 ```bash
 npm install
 cp .env.example .env
-npm run dev:erp-fixture   # terminal 1: fake upstream ERP MCP server
-npm run dev:gateway       # terminal 2: gateway, proxies to the fixture
+npm run dev:gateway-http   # terminal 1: gateway over HTTP (spawns the ERP fixture itself)
+cd web && npm install && npm run dev   # terminal 2: approval inbox UI, http://localhost:5173
 ```
+
+Sign in to the inbox with `GATEKEEP_APPROVER_TOKEN` from `.env` (NOT
+`GATEKEEP_LOCAL_TOKEN` — see "Two separate tokens" below). Or skip the UI
+entirely and use the CLI: `npm run dev:gateway` (stdio) +
+`npm run cli -- approve <id>` / `list` / `show <id> [--reveal]` / `verify`.
+
+### Two separate tokens
+
+`GATEKEEP_LOCAL_TOKEN` authenticates agents calling `/mcp`.
+`GATEKEEP_APPROVER_TOKEN` authenticates humans logging into the inbox at
+`/api`. They're deliberately different secrets: if an agent's own gateway
+token also worked as an approver login, it could approve its own pending
+calls — exactly the self-approval gap exact-call hashing exists to close
+one layer up.

@@ -6,3 +6,5 @@ data/*.sqlite-wal
 .env
 *.log
 coverage/
+web/node_modules/
+web/dist/

@@ -31,3 +31,21 @@ radius. It does not make agents safe.
   anyone runs this unattended.
 - **Untested against MCP clients predating the 2026-07-28 spec revision** —
   see SECURITY.md for what changed and what's untested.
+- **Approval-inbox sessions are in-memory and single-process.** A gateway
+  restart logs every approver out; there's no shared session store for
+  running more than one gateway process. Fine for local/single-host use,
+  not for a horizontally-scaled deployment.
+- **The inbox's CSRF token lives only in the browser tab's memory**, never
+  localStorage — a reload loses it (log in again). Deliberate: anywhere
+  more durable is more exposed to XSS reading it. See `web/src/api.ts`.
+- **`__Host-` session cookies require a secure context.** They work over
+  plain `http://127.0.0.1` / `http://localhost` because browsers treat the
+  loopback address as "potentially trustworthy," but the inbox has not
+  been tested behind a real TLS-terminating proxy yet — do that before
+  exposing it beyond localhost.
+- **The reveal-mode table in `src/web/reveal.ts` / `web/src/reveal.ts` is a
+  denylist of known tricks**, not an exhaustive Unicode confusables
+  defense. It catches the specific categories in the build spec's red-team
+  corpus (zero-width, RTL/LTR overrides, NBSP) but not, for example,
+  homoglyph substitution (the hash still binds the exact bytes either way —
+  see the Unicode red-team tests — this only affects what a human *sees*).
