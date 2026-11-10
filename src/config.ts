@@ -30,6 +30,8 @@ export interface GatewayConfig {
   approverToken: string;
   /** v1: a single fixed principal. Multi-user/RBAC is explicitly out of scope — see README. */
   principal: string;
+  /** Optional: all three must be set to enable Telegram notifications + the inline approve/deny buttons. */
+  telegram?: { botToken: string; chatId: string; webhookSecret: string };
 }
 
 export function loadConfig(configPath = "./gatekeep.config.yaml"): GatewayConfig {
@@ -42,5 +44,13 @@ export function loadConfig(configPath = "./gatekeep.config.yaml"): GatewayConfig
     localToken: process.env.GATEKEEP_LOCAL_TOKEN ?? "dev-only-insecure-token",
     approverToken: process.env.GATEKEEP_APPROVER_TOKEN ?? "dev-only-insecure-approver-token",
     principal: process.env.GATEKEEP_PRINCIPAL ?? "local-user",
+    telegram:
+      process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID && process.env.TELEGRAM_WEBHOOK_SECRET
+        ? {
+            botToken: process.env.TELEGRAM_BOT_TOKEN,
+            chatId: process.env.TELEGRAM_CHAT_ID,
+            webhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET,
+          }
+        : undefined,
   };
 }

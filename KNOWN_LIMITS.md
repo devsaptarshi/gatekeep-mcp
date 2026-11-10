@@ -43,6 +43,22 @@ radius. It does not make agents safe.
   loopback address as "potentially trustworthy," but the inbox has not
   been tested behind a real TLS-terminating proxy yet — do that before
   exposing it beyond localhost.
+- **Telegram integration is untested against a live bot.** No bot token
+  was available while building it. `src/notify/telegram.ts` and
+  `src/notify/telegram-webhook.ts` are unit-tested against a mocked
+  `fetch` and a real Hono app (`tests/telegram.test.ts`,
+  `tests/telegram-webhook.test.ts`), which verifies the request/response
+  shapes match Telegram's documented Bot API — but that's not the same as
+  confirming it against the real service. Before relying on it: run
+  `npm run telegram:set-webhook` against a real bot and manually verify a
+  notification arrives and both buttons work.
+- **A decision made via the CLI or web inbox doesn't update the Telegram
+  message.** The approval itself is correctly decided either way (single
+  source of truth: the `approvals` table) — only the Telegram message's
+  buttons/text can go stale if the decision came from elsewhere. Tracked
+  by an in-memory, single-process map (`SentMessageStore`), which also
+  means a gateway restart loses the mapping for any still-pending
+  approval's Telegram message.
 - **The reveal-mode table in `src/web/reveal.ts` / `web/src/reveal.ts` is a
   denylist of known tricks**, not an exhaustive Unicode confusables
   defense. It catches the specific categories in the build spec's red-team

@@ -11,6 +11,7 @@ import {
 } from "../db/repositories/approvals.js";
 import { strictest, type PolicyEngine } from "../policy/engine.js";
 import { hasSeenAnyTag, recordTags } from "../db/repositories/run-tags.js";
+import type { ApprovalRow } from "../db/repositories/approvals.js";
 import type { ToolRegistry } from "./tool-registry.js";
 
 export interface ToolCallResult {
@@ -32,6 +33,8 @@ export interface CallHandlerDeps {
   forwardToUpstream: ForwardFn;
   /** Groups this handler's audit events with the gateway process (or test run) that made the call. */
   runId: string;
+  /** Fired once a call starts (or restarts, after expiry) waiting on a human — e.g. to send a Telegram notice. Never awaited into the response path: a notification failure must not block the gateway's own answer. */
+  onApprovalPending?: (approval: ApprovalRow) => void;
 }
 
 function errorResult(text: string): ToolCallResult {
@@ -125,6 +128,7 @@ export async function handleToolCall(
       const renewed = renewExpiredToPending(deps.db, fresh.id, deps.policyEngine.file.defaults.approval_ttl_seconds);
       if (renewed) {
         appendEvent(deps.db, { runId: deps.runId, event: "approval_renewed_after_expiry", callHash, payload: auditPayload });
+        deps.onApprovalPending?.(renewed);
         return errorResult(
           `Approval pending (id=${renewed.id}). Ask an approver to run: gatekeep approve ${renewed.id}`,
         );
@@ -184,6 +188,7 @@ export async function handleToolCall(
     ttlSeconds: deps.policyEngine.file.defaults.approval_ttl_seconds,
   });
   appendEvent(deps.db, { runId: deps.runId, event: "approval_created", callHash, decision: "approve", payload: auditPayload });
+  deps.onApprovalPending?.(created);
   return errorResult(
     `Approval required (id=${created.id}): ${decision.reason}. ` +
       `Ask an approver to run: gatekeep approve ${created.id}, then retry this exact call.`,

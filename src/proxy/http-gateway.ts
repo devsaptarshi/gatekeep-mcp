@@ -5,6 +5,7 @@ import { Hono } from "hono";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { loadConfig } from "../config.js";
 import { openDb } from "../db/client.js";
+import type { ApprovalRow } from "../db/repositories/approvals.js";
 import { PolicyEngine } from "../policy/engine.js";
 import { buildGatewayServer } from "./gateway-server.js";
 import { checkHeaderBodyConsistency, checkLocalToken, checkOrigin } from "./http-security.js";
@@ -12,6 +13,9 @@ import { ToolRegistry } from "./tool-registry.js";
 import { closeUpstreams, connectUpstreams } from "./upstream-manager.js";
 import { buildWebApi } from "../web/api.js";
 import { SessionStore } from "../web/session.js";
+import { TelegramClient } from "../notify/telegram.js";
+import { SentMessageStore } from "../notify/sent-message-store.js";
+import { buildTelegramWebhook } from "../notify/telegram-webhook.js";
 
 const HOST = process.env.GATEKEEP_HTTP_HOST ?? "127.0.0.1";
 const PORT = Number(process.env.GATEKEEP_HTTP_PORT ?? 3100);
@@ -39,8 +43,33 @@ async function main() {
   // this request's audit events together; it never depends on a
   // transport-level session, so per-request transports don't fragment it.
   const runId = randomUUID();
+
+  // Telegram notifications are entirely optional — only wired up when all
+  // three env vars are set (see config.ts). A failure to notify (bad
+  // token, network hiccup, bot not started) is logged and swallowed, never
+  // thrown into the response path: the approval itself is unaffected
+  // either way, and the CLI/web inbox remain available regardless.
+  const telegramMessages = new SentMessageStore();
+  const telegramClient = config.telegram ? new TelegramClient(config.telegram) : undefined;
+  const onApprovalPending = telegramClient
+    ? (approval: ApprovalRow) => {
+        telegramClient
+          .sendApprovalNotice({
+            id: approval.id,
+            serverId: approval.serverId,
+            toolName: approval.toolName,
+            principal: approval.principal,
+            reason: approval.reason,
+            expiresAt: approval.expiresAt,
+            canonicalArgs: approval.canonicalArgs,
+          })
+          .then((sent) => telegramMessages.set(approval.id, sent))
+          .catch((err) => console.error(`[gatekeep-http] Telegram notify failed for ${approval.id}:`, err));
+      }
+    : undefined;
+
   async function handleOneRequest(request: Request, parsedBody: unknown): Promise<Response> {
-    const mcpServer = buildGatewayServer({ db, registry, policyEngine, principal: config.principal, upstreams, runId });
+    const mcpServer = buildGatewayServer({ db, registry, policyEngine, principal: config.principal, upstreams, runId, onApprovalPending });
     const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     await mcpServer.connect(transport);
     return transport.handleRequest(request, { parsedBody });
@@ -94,6 +123,14 @@ async function main() {
 
   const sessions = new SessionStore();
   app.route("/api", buildWebApi({ db, approverToken: config.approverToken, sessions }));
+
+  if (config.telegram && telegramClient) {
+    app.route(
+      "/telegram",
+      buildTelegramWebhook({ db, client: telegramClient, messages: telegramMessages, webhookSecret: config.telegram.webhookSecret }),
+    );
+    console.error("[gatekeep-http] Telegram notifications enabled; webhook at /telegram/webhook");
+  }
 
   const server = serve({ fetch: app.fetch, hostname: HOST, port: PORT }, (info) => {
     console.error(`[gatekeep-http] listening on http://${HOST}:${info.port}/mcp (${registry.list().length} tool(s))`);

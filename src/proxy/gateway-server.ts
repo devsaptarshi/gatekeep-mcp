@@ -1,6 +1,7 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import type { GatekeepDb } from "../db/client.js";
+import type { ApprovalRow } from "../db/repositories/approvals.js";
 import type { PolicyEngine } from "../policy/engine.js";
 import { handleToolCall, type ToolCallResult } from "./call-handler.js";
 import type { ConnectedUpstream } from "./upstream-manager.js";
@@ -13,6 +14,7 @@ export interface GatewayServerDeps {
   principal: string;
   upstreams: ConnectedUpstream[];
   runId: string;
+  onApprovalPending?: (approval: ApprovalRow) => void;
 }
 
 /**
@@ -47,6 +49,7 @@ export function buildGatewayServer(deps: GatewayServerDeps): Server {
         policyEngine: deps.policyEngine,
         principal: deps.principal,
         runId: deps.runId,
+        onApprovalPending: deps.onApprovalPending,
         forwardToUpstream: async (serverId, toolName, forwardArgs) => {
           const upstream = upstreamsById.get(serverId);
           if (!upstream) {
