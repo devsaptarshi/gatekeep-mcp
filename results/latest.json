@@ -1,0 +1,15 @@
+{
+  "generatedAt": "2026-11-10T07:11:52.056Z",
+  "latency": {
+    "generatedAt": "2026-11-10T07:11:52.056Z",
+    "samples": 2000,
+    "meanMs": 0.5038,
+    "p50Ms": 0.4213,
+    "p95Ms": 0.7236,
+    "p99Ms": 2.3957,
+    "maxMs": 12.7025,
+    "targetP95Ms": 10,
+    "meetsTarget": true,
+    "note": "handleToolCall() in-process against a real on-disk SQLite file, no-op upstream — gateway's own overhead only, not MCP transport/process latency."
+  }
+}

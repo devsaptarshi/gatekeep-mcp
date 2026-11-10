@@ -16,6 +16,7 @@
     "smoke": "tsx scripts/smoke-test.ts",
     "telegram:set-webhook": "tsx scripts/telegram-set-webhook.ts",
     "eval:layer2": "tsx scripts/layer2-eval.ts",
+    "bench:latency": "tsx scripts/latency-bench.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit",
