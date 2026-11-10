@@ -99,4 +99,15 @@ describe("PolicyEngine.decide", () => {
     });
     expect(deny.action).toBe("deny");
   });
+
+  it("routes the optional erp-analyst ask_erp tool to approve, not auto-allow, despite being read-only", () => {
+    const engine = PolicyEngine.fromFile(new URL("../policies/default.yaml", import.meta.url).pathname);
+    const decision = engine.decide({
+      serverId: "erp-analyst",
+      toolName: "ask_erp",
+      arguments: { question: "material yield by supplier last quarter", tenantName: "Acme Leather Co" },
+      principal: "alice",
+    });
+    expect(decision.action).toBe("approve");
+  });
 });

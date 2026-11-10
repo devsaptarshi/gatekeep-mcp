@@ -54,6 +54,21 @@ servers:
       list_pending_invoices: [untrusted_read]
       create_payment: [external_send]
 
+  erp-analyst:
+    rules:
+      # ask_erp is read-only end to end (no write tool in the agent, no
+      # write grants in its DB role) but it still answers with another
+      # tenant's business data if the tenantName argument is ever wrong —
+      # and that argument comes from the calling model, not from a
+      # verified session, once it's behind this gateway rather than the
+      # agent's own frontend. Routing it to "approve" means a human sees
+      # which tenant is about to be queried before the call goes out,
+      # which is exactly the kind of cross-tenant mistake sqlglot/RLS
+      # can't catch because it isn't a SQL-injection problem at all.
+      - tool: "ask_erp"
+        action: approve
+        reason: "confirm the tenant before letting a model query ERP data on its behalf"
+
 # A run that read invoice text and THEN tries to pay — even a small,
 # normally auto-allowed amount — waits for a human. This is the gateway's
 # own flagship scenario: a poisoned invoice's injected instructions live in

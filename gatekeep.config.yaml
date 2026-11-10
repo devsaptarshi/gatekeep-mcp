@@ -10,3 +10,9 @@ upstreams:
   - id: erp-fixture
     command: ./node_modules/.bin/tsx
     args: ["fixtures/erp-server/index.ts"]
+  # Optional: the sibling erp-analyst-agent project's text-to-SQL agent,
+  # exposed as a single ask_erp tool. Requires that project's FastAPI
+  # backend running separately (see fixtures/erp-analyst-tool/index.ts).
+  - id: erp-analyst
+    command: ./node_modules/.bin/tsx
+    args: ["fixtures/erp-analyst-tool/index.ts"]
