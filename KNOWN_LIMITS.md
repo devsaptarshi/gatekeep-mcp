@@ -43,6 +43,20 @@ radius. It does not make agents safe.
   loopback address as "potentially trustworthy," but the inbox has not
   been tested behind a real TLS-terminating proxy yet — do that before
   exposing it beyond localhost.
+- **The layer-2 live-agent eval (`scripts/layer2-eval.ts`) has not been
+  run.** It needs an `ANTHROPIC_API_KEY` separate from whatever credential
+  runs Claude Code itself, and costs real money per run; no key was
+  available while building this. The script is complete — it connects a
+  real Claude agent via the Messages API to the gateway's actual MCP
+  tools, runs it against the poisoned-invoice scenario with no human in
+  the loop, and checks whether `create_payment` ever executed without
+  being held — and was confirmed to connect to the real gateway and fail
+  cleanly with a clear error at the one missing piece (the API key), not
+  silently or with a stack trace pointing somewhere unhelpful. It has not
+  yet produced a real transcript or a real pass/fail result. Run it with
+  `ANTHROPIC_API_KEY=sk-... npm run eval:layer2` before trusting that this
+  gateway holds up against an actual model, not just the deterministic
+  layer-1 corpus.
 - **Telegram integration is untested against a live bot.** No bot token
   was available while building it. `src/notify/telegram.ts` and
   `src/notify/telegram-webhook.ts` are unit-tested against a mocked
