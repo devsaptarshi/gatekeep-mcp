@@ -4,10 +4,14 @@ import Database from "better-sqlite3";
 import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema.js";
 
-// Week 1: hand-written idempotent DDL, executed at startup. Formal
-// drizzle-kit migrations (tracked, reviewable SQL files) are a Week 2 item
-// once the schema has settled past "tool_pins + approvals" — see the build
-// spec's Week 2 scope (audit_events, run_tags).
+// Hand-written idempotent DDL, executed at startup. The schema settled
+// (tool_pins, approvals, audit_events, run_tags) without ever needing
+// formal drizzle-kit migrations in practice — this file has been the only
+// thing to touch the schema across all three weeks. Left as a plain
+// `CREATE TABLE IF NOT EXISTS` rather than introducing migration tooling
+// for its own sake; revisit if the schema needs to evolve after v0.1.0
+// ships (an ALTER TABLE a real deployment has already run against is a
+// different problem than CREATE TABLE IF NOT EXISTS on a fresh DB).
 const DDL = `
 CREATE TABLE IF NOT EXISTS tool_pins (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

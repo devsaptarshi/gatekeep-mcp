@@ -49,14 +49,29 @@ both of which are core to gatekeep's design.
 
 ## Status
 
-Week 2 of 3 done — see the build spec for the three-week plan. Not ready
-for anything beyond local development and the fixtures in this repo.
+All three weeks of the build plan are done. v0.1.0 is tagged for local
+use and portfolio review; see [KNOWN_LIMITS.md](./KNOWN_LIMITS.md) before
+relying on this beyond that — a few things (the live layer-2 agent eval,
+Telegram against a real bot) are built and tested in isolation but not
+yet confirmed end-to-end against the real external services they talk to.
 
-Shipped so far: canonical-hash approval binding, the MCP stdio and
-Streamable HTTP proxy, a YAML/CEL policy engine, a hash-chained tamper-
-evident audit log (`gatekeep verify`), secret redaction, local-gateway HTTP
-hardening (Origin allowlist, bearer token, header/body consistency), and a
-89-case layer-1 red-team corpus. 153/153 tests pass.
+Shipped: canonical-hash approval binding; the MCP stdio and Streamable
+HTTP proxy; a YAML/CEL policy engine with flow rules (`run_tags`) for
+multi-step attacks; a hash-chained tamper-evident audit log
+(`gatekeep verify`); secret redaction; local-gateway HTTP hardening
+(Origin allowlist, bearer token, header/body consistency); a React
+approval inbox with session/CSRF/clickjacking hardening and a Unicode
+reveal mode; Telegram notifications with inline approve/deny; a 89-case
+layer-1 red-team corpus (deterministic, runs on every PR) plus a
+real-API-ready layer-2 harness; and a latency benchmark (p95 0.72ms
+gateway overhead, target was <10ms — see
+[results/latest.json](./results/latest.json)).
+
+**236/236 tests pass.** See [LESSONS.md](./LESSONS.md) for what actually
+went wrong while building this and what caught it — including two real
+bugs (a single-use-per-request SDK transport, orphaned processes from
+spawning through `npx`) that only a real end-to-end run surfaced, not the
+unit tests.
 
 ### Proving the test suite can actually fail
 
@@ -100,3 +115,23 @@ entirely and use the CLI: `npm run dev:gateway` (stdio) +
 token also worked as an approver login, it could approve its own pending
 calls — exactly the self-approval gap exact-call hashing exists to close
 one layer up.
+
+### Other scripts
+
+```bash
+npm run smoke              # end-to-end: real gateway + fixture + CLI, including the tamper-detection round trip
+npm run bench:latency      # gateway's own added-latency benchmark (p95/p99/max)
+npm run eval:layer2        # a real Claude agent vs. the poisoned-invoice scenario (needs ANTHROPIC_API_KEY, costs money — see KNOWN_LIMITS.md)
+npm run telegram:set-webhook  # one-time: register the webhook with Telegram (needs a public HTTPS URL)
+```
+
+### Build / publish
+
+```bash
+npm run build   # tsc -p tsconfig.build.json -> dist/, matching the "bin" path in package.json
+npm pack --dry-run   # see exactly what `files` in package.json would publish
+```
+
+Not yet pushed to a public repository or published to npm — the
+`LICENSE` file's copyright line and `package.json`'s `author`/`repository`
+fields are left for whoever does that to fill in.
