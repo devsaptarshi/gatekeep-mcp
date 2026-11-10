@@ -9,7 +9,8 @@ import {
   findByCallHash,
   renewExpiredToPending,
 } from "../db/repositories/approvals.js";
-import type { PolicyEngine } from "../policy/engine.js";
+import { strictest, type PolicyEngine } from "../policy/engine.js";
+import { hasSeenAnyTag, recordTags } from "../db/repositories/run-tags.js";
 import type { ToolRegistry } from "./tool-registry.js";
 
 export interface ToolCallResult {
@@ -91,6 +92,7 @@ export async function handleToolCall(
   if (consumed) {
     const forwardArgs = JSON.parse(consumed.canonicalArgs) as Record<string, unknown>;
     appendEvent(deps.db, { runId: deps.runId, event: "approval_consumed_and_executed", callHash, decision: "approve", payload: auditPayload });
+    recordTags(deps.db, deps.runId, tool.toolName, deps.policyEngine.tagsFor(tool.serverId, tool.toolName));
     return deps.forwardToUpstream(tool.serverId, tool.toolName, forwardArgs);
   }
 
@@ -130,12 +132,36 @@ export async function handleToolCall(
     }
   }
 
-  const decision = deps.policyEngine.decide({
+  let decision = deps.policyEngine.decide({
     serverId: tool.serverId,
     toolName: tool.toolName,
     arguments: args,
     principal: deps.principal,
   });
+
+  // Flow rules can only TIGHTEN the base decision, never loosen it — same
+  // principle as untrusted tool annotations (SECURITY.md). A flow fires
+  // when this tool carries a tag a flow is watching for (`then_tag`) AND
+  // this run already recorded one of that flow's `if_seen` tags earlier.
+  for (const flow of deps.policyEngine.flowsFor(tool.serverId, tool.toolName)) {
+    if (hasSeenAnyTag(deps.db, deps.runId, flow.if_seen)) {
+      const flowAction = strictest(decision.action, flow.action);
+      if (flowAction !== decision.action) {
+        appendEvent(deps.db, {
+          runId: deps.runId,
+          event: "flow_rule_escalated",
+          callHash,
+          decision: flowAction,
+          payload: { ...auditPayload, flow: flow.name, if_seen: flow.if_seen, base_action: decision.action },
+        });
+      }
+      decision = {
+        action: flowAction,
+        reason: flowAction === decision.action ? decision.reason : `flow "${flow.name}": ${flow.reason ?? `saw ${flow.if_seen.join("/")} earlier this run`}`,
+        matchedRule: decision.matchedRule,
+      };
+    }
+  }
 
   if (decision.action === "deny") {
     appendEvent(deps.db, { runId: deps.runId, event: "policy_denied", callHash, decision: "deny", payload: auditPayload });
@@ -144,6 +170,7 @@ export async function handleToolCall(
 
   if (decision.action === "allow") {
     appendEvent(deps.db, { runId: deps.runId, event: "policy_allowed_and_executed", callHash, decision: "allow", payload: auditPayload });
+    recordTags(deps.db, deps.runId, tool.toolName, deps.policyEngine.tagsFor(tool.serverId, tool.toolName));
     return deps.forwardToUpstream(tool.serverId, tool.toolName, args);
   }
 

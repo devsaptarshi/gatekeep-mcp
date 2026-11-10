@@ -34,6 +34,15 @@ CREATE TABLE IF NOT EXISTS approvals (
   consumed_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS run_tags (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id TEXT NOT NULL,
+  tag TEXT NOT NULL,
+  source_tool TEXT NOT NULL,
+  seen_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS run_tags_run_id ON run_tags(run_id);
+
 CREATE TABLE IF NOT EXISTS audit_events (
   seq INTEGER PRIMARY KEY AUTOINCREMENT,
   run_id TEXT NOT NULL,

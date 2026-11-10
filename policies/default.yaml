@@ -43,3 +43,26 @@ servers:
       - tool: "update_vendor_bank_details"
         action: deny
         reason: "bank-detail changes are not permitted through the gateway in v1 — do this out-of-band and re-pin manually"
+
+    # Operator-assigned tags — NOT taken from the fixture's own tool
+    # definitions (those are untrusted input from the upstream; see
+    # SECURITY.md). list_pending_invoices returns invoice descriptions
+    # that could carry an injected instruction (the "poisoned invoice"
+    # case in fixtures/erp-server/data.ts); create_payment sends money
+    # externally.
+    tags:
+      list_pending_invoices: [untrusted_read]
+      create_payment: [external_send]
+
+# A run that read invoice text and THEN tries to pay — even a small,
+# normally auto-allowed amount — waits for a human. This is the gateway's
+# own flagship scenario: a poisoned invoice's injected instructions live in
+# text the agent reads via list_pending_invoices, then tries to act on by
+# calling create_payment. Neither call looks risky in isolation; the
+# sequence is what matters.
+flows:
+  - name: untrusted-to-external
+    if_seen: [untrusted_read]
+    then_tag: external_send
+    action: approve
+    reason: "this run read invoice text earlier and is now trying to send a payment"

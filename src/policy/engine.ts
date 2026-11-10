@@ -4,9 +4,13 @@ import { evaluate as evaluateCel } from "@marcbachmann/cel-js";
 import { minimatch } from "minimatch";
 import { parse as parseYaml } from "yaml";
 import { canonicalize } from "../hash/canonical-json.js";
-import { PolicyFileSchema, type PolicyDecision, type PolicyEvalContext, type PolicyFile, type PolicyRule } from "./types.js";
+import { PolicyFileSchema, type FlowRule, type PolicyAction, type PolicyDecision, type PolicyEvalContext, type PolicyFile, type PolicyRule } from "./types.js";
 
 const ACTION_RANK: Record<string, number> = { deny: 3, approve: 2, allow: 1 };
+
+export function strictest(a: PolicyAction, b: PolicyAction): PolicyAction {
+  return ACTION_RANK[a]! >= ACTION_RANK[b]! ? a : b;
+}
 
 export class PolicyEngine {
   readonly file: PolicyFile;
@@ -80,5 +84,17 @@ export class PolicyEngine {
       reason: winner.reason ?? `matched rule tool="${winner.tool}" action="${winner.action}"`,
       matchedRule: winner,
     };
+  }
+
+  /** Operator-assigned tags for one tool — never taken from the upstream's own tool definition. */
+  tagsFor(serverId: string, toolName: string): string[] {
+    return this.file.servers[serverId]?.tags[toolName] ?? [];
+  }
+
+  /** Flow rules that could apply to this tool, because one of its tags matches a flow's `then_tag`. */
+  flowsFor(serverId: string, toolName: string): FlowRule[] {
+    const tags = this.tagsFor(serverId, toolName);
+    if (tags.length === 0) return [];
+    return this.file.flows.filter((flow) => tags.includes(flow.then_tag));
   }
 }

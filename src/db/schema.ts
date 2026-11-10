@@ -52,6 +52,21 @@ export const approvals = sqliteTable("approvals", {
  * table and recomputes it; it must catch every edited row, not just the
  * most recent one.
  */
+/**
+ * Remembers risky events (e.g. "untrusted_read") within one gateway run,
+ * so a flow rule can require human approval the first time a run tries to
+ * follow an untrusted read with an external-send tool — even though
+ * either action alone might be fine. See policy `flows` + PolicyEngine's
+ * `tagsFor`/`flowsFor`.
+ */
+export const runTags = sqliteTable("run_tags", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  runId: text("run_id").notNull(),
+  tag: text("tag").notNull(),
+  sourceTool: text("source_tool").notNull(),
+  seenAt: text("seen_at").notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
+});
+
 export const auditEvents = sqliteTable("audit_events", {
   seq: integer("seq").primaryKey({ autoIncrement: true }),
   runId: text("run_id").notNull(),
